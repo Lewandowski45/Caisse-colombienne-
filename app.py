@@ -840,11 +840,16 @@ def api_historique():
     ])
 
 
-# Initialise la base au chargement du module : nécessaire pour que ça
-# fonctionne aussi sous Gunicorn/production, pas seulement avec "python app.py".
-init_db()
+# init_db() n'est PAS appelée automatiquement au chargement du module.
+# Les tables et le compte super_admin existent déjà sur Supabase — l'appeler
+# à chaque démarrage à froid de la fonction (Vercel) ajoutait plusieurs
+# allers-retours réseau vers la base (Europe) depuis la fonction (États-Unis),
+# assez pour faire échouer les robots stricts comme celui de PWABuilder.
+# Pour ré-initialiser un schéma vierge (nouveau projet Supabase), lance
+# `python app.py` en local une fois : le bloc ci-dessous l'appelle alors.
 
 if __name__ == "__main__":
+    init_db()
     # host="127.0.0.1" = accessible uniquement en local. Pour un vrai
     # déploiement, utilisez Gunicorn (voir Procfile) derrière un reverse
     # proxy HTTPS, jamais app.run() en production.
