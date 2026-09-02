@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.caisse_colombienne.twa",
+        "sha256_cert_fingerprints": ["91:03:BC:ED:77:C2:59:69:40:90:5F:F2:81:AB:5F:4D:34:0B:EE:DF:11:8E:16:B9:1A:72:15:F6:98:10:32:EB"]
+      }
+    }]
