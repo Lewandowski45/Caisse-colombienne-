@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title>La Caisse d'Épargne Colombienne 🇨🇴</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body { -webkit-tap-highlight-color: transparent; }
+        .modal-backdrop { background: rgba(15, 23, 42, .60); }
+        .member-card { transition: transform .15s ease, box-shadow .15s ease; }
+        .member-card:active { transform: scale(.99); }
+        .hidden-force { display: none !important; }
+    </style>
+</head>
+<!-- CSRF_TOKEN et rôle courant utilisés par le JS plus bas (fetch, formulaires générés dynamiquement) -->
+<script>
+    const CSRF_TOKEN = "{{ csrf_token() }}";
+    const CAN_EDIT = {{ (current_user.role in ['tresorier', 'super_admin'])|tojson }};
+</script>
+
+<body class="bg-slate-100 font-sans text-slate-800">
+
+<header class="bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white border-b-4 border-amber-400 shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4 md:py-6">
+        <div class="flex flex-col lg:flex-row justify-between gap-4 items-start lg:items-center">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-extrabold tracking-wide">
+                    La Caisse d'Épargne Colombienne 🇨🇴
+                </h1>
+                <p class="text-slate-300 text-sm mt-1">
+                    Gestion des cotisations & suivi de la trésorerie
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+                {% if current_user.role in ['tresorier', 'super_admin'] %}
+                <button onclick="openModal('modal-membre')"
+                        class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-4 py-2.5 rounded-lg shadow text-sm">
+                    <i class="fa-solid fa-user-plus"></i> Membre
+                </button>
+
+                <button onclick="openModal('modal-cotisation')"
+                        class="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold px-4 py-2.5 rounded-lg shadow text-sm">
+                    <i class="fa-solid fa-plus-circle"></i> Versement
+                </button>
+
+                <button onclick="openModal('modal-depense')"
+                        class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-lg shadow text-sm">
+                    <i class="fa-solid fa-minus-circle"></i> Dépense
+                </button>
+                {% else %}
+                <span class="text-xs bg-slate-800 text-slate-300 px-3 py-1.5 rounded-lg">
+                    <i class="fa-solid fa-eye"></i> Lecture seule
+                </span>
+                {% endif %}
+
+                <div class="flex items-center gap-2 ml-2 pl-2 border-l border-slate-700">
+                    <span class="text-sm text-slate-300">
+                        <i class="fa-solid fa-user-circle"></i> {{ current_user.nom_complet }}
+                        <span class="text-xs bg-slate-700 px-2 py-0.5 rounded ml-1">
+                            {% if current_user.role == 'super_admin' %}Super admin
+                            {% elif current_user.role == 'tresorier' %}Trésorier
+                            {% else %}Lecture{% endif %}
+                        </span>
+                    </span>
+                    {% if current_user.role == 'super_admin' %}
+                    <a href="{{ url_for('utilisateurs') }}"
+                       class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg">
+                        <i class="fa-solid fa-user-gear"></i> Comptes
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}"
+                       class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg">
+                        Déconnexion
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-6 md:py-8">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="space-y-2 mb-6">
+                {% for category, message in messages %}
+                    <div class="rounded-xl px-4 py-3 shadow-sm border
+                        {% if category == 'success' %}
+                            bg-emerald-50 text-emerald-800 border-emerald-200
+                        {% elif category == 'danger' %}
+                            bg-rose-50 text-rose-800 border-rose-200
+                        {% else %}
+                            bg-blue-50 text-blue-800 border-blue-200
+                        {% endif %}">
+                        <i class="fa-solid fa-circle-check mr-2"></i>{{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- DASHBOARD -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 border-t-4 border-t-blue-600">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total épargné</p>
+                    <h2 class="text-2xl font-black text-blue-700 mt-2">{{ "{:,.0f}".format(total_epargne) }} FCFA</h2>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-piggy-bank"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 border-t-4 border-t-rose-600">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total dépenses</p>
+                    <h2 class="text-2xl font-black text-rose-600 mt-2">{{ "{:,.0f}".format(total_depenses) }} FCFA</h2>
+                </div>
+                <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-receipt"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-emerald-50 rounded-2xl shadow-sm border border-emerald-200 p-5 border-t-4 border-t-emerald-600">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-emerald-800 uppercase tracking-wider">Solde disponible</p>
+                    <h2 class="text-2xl md:text-3xl font-black text-emerald-700 mt-2">{{ "{:,.0f}".format(solde_net) }} FCFA</h2>
+                    <p class="text-xs text-emerald-600 mt-1">Épargne - dépenses</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xl shadow">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MEMBRES -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6 mb-8" id="membres">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5 border-b pb-4">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-users text-indigo-600"></i>
+                    Membres
+                </h3>
+                <p class="text-sm text-slate-500 mt-1">
+                    Total payé, suivi mensuel et historique individuel.
+                </p>
+            </div>
+
+            {% if current_user.role in ['tresorier', 'super_admin'] %}
+            <button onclick="openModal('modal-membre')"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-lg text-sm">
+                <i class="fa-solid fa-user-plus"></i> Ajouter un membre
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="relative mb-5">
+            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input id="memberSearch"
+                   type="search"
+                   oninput="filterMembers()"
+                   placeholder="Rechercher par nom ou téléphone..."
+                   class="w-full border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div id="noMemberResult" class="hidden-force text-center py-8 text-slate-500">
+            <i class="fa-solid fa-user-slash text-3xl mb-2"></i>
+            <p>Aucun membre trouvé.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="membersGrid">
+            {% for m in membres %}
+            <article class="member-card member-item border border-slate-200 rounded-2xl p-4 bg-slate-50"
+                     data-name="{{ m.nom|lower }}"
+                     data-phone="{{ (m.telephone or '')|lower }}">
+
+                <div class="flex justify-between gap-3">
+                    <div class="min-w-0">
+                        <h4 class="font-extrabold text-slate-900 text-lg truncate">{{ m.nom }}</h4>
+                        <p class="text-sm text-slate-500 mt-1">
+                            <i class="fa-solid fa-phone mr-1"></i>{{ m.telephone or "Téléphone non renseigné" }}
+                        </p>
+                    </div>
+
+                    <div class="w-11 h-11 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-4">
+                    <div class="bg-white rounded-xl p-3 border">
+                        <p class="text-[11px] uppercase font-bold text-slate-400">Total payé</p>
+                        <p class="font-black text-emerald-600 mt-1">{{ "{:,.0f}".format(m.total_paye) }} FCFA</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 border">
+                        <p class="text-[11px] uppercase font-bold text-slate-400">Mensuel</p>
+                        <p class="font-black text-blue-600 mt-1">{{ "{:,.0f}".format(m.cotisation_mensuelle) }} FCFA</p>
+                    </div>
+                </div>
+
+                <div class="mt-3 text-xs text-slate-500 flex justify-between">
+                    <span>{{ m.nombre_paiements }} paiement(s)</span>
+                    <span>Dernier : {{ m.dernier_paiement or "—" }}</span>
+                </div>
+
+                <div class="grid {% if current_user.role in ['tresorier', 'super_admin'] %}grid-cols-2{% endif %} gap-2 mt-4">
+                    <button onclick="showHistory({{ m.id }})"
+                            class="bg-slate-900 hover:bg-slate-800 text-white rounded-lg py-2.5 text-sm font-bold">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Historique
+                    </button>
+
+                    {% if current_user.role in ['tresorier', 'super_admin'] %}
+                    <button onclick='editMember({{ m.id }}, {{ m.nom|tojson }}, {{ (m.telephone or "")|tojson }}, {{ m.cotisation_mensuelle }})'
+                            class="bg-white hover:bg-slate-100 border rounded-lg py-2.5 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-pen"></i> Modifier
+                    </button>
+                    {% endif %}
+                </div>
+
+                <div class="flex gap-2 mt-2">
+                    {% if m.telephone %}
+                    <a href="tel:{{ m.telephone }}"
+                       class="flex-1 text-center bg-emerald-100 text-emerald-700 rounded-lg py-2 text-sm font-bold">
+                        <i class="fa-solid fa-phone"></i> Appeler
+                    </a>
+
+                    <a href="https://wa.me/{{ m.telephone|replace(' ', '')|replace('+', '') }}"
+                       target="_blank"
+                       class="flex-1 text-center bg-green-100 text-green-700 rounded-lg py-2 text-sm font-bold">
+                        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                    </a>
+                    {% endif %}
+
+                    {% if current_user.role in ['tresorier', 'super_admin'] %}
+                    <form action="{{ url_for('supprimer_membre', membre_id=m.id) }}"
+                          method="POST"
+                          class="{% if m.telephone %}shrink-0{% else %}w-full{% endif %}"
+                          onsubmit="return confirm('Supprimer ce membre et tout son historique de paiements ? Cette action est irréversible.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="bg-rose-100 text-rose-700 rounded-lg py-2 px-3 text-sm font-bold">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- COTISATIONS / DEPENSES -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-lg font-bold text-slate-800">
+                    <i class="fa-solid fa-arrow-down-long text-emerald-500"></i>
+                    Dernières cotisations
+                </h3>
+                <button onclick="openAllHistory()" class="text-sm font-bold text-indigo-600">Tout voir</button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                        <tr>
+                            <th class="py-3 px-2">Date</th>
+                            <th class="py-3 px-2">Membre</th>
+                            <th class="py-3 px-2">Mode</th>
+                            <th class="py-3 px-2 text-right">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for c in cotisations %}
+                        <tr>
+                            <td class="py-3 px-2 text-slate-500 whitespace-nowrap">{{ c.date_cotisation }}</td>
+                            <td class="py-3 px-2 font-semibold">{{ c.nom }}</td>
+                            <td class="py-3 px-2"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">{{ c.mode_paiement }}</span></td>
+                            <td class="py-3 px-2 text-right font-bold text-emerald-600 whitespace-nowrap">+{{ "{:,.0f}".format(c.montant) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="py-6 text-center text-slate-500">Aucune cotisation.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-lg font-bold text-slate-800">
+                    <i class="fa-solid fa-arrow-up-long text-rose-500"></i>
+                    Dernières dépenses
+                </h3>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                        <tr>
+                            <th class="py-3 px-2">Date</th>
+                            <th class="py-3 px-2">Motif</th>
+                            <th class="py-3 px-2">Catégorie</th>
+                            <th class="py-3 px-2 text-right">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for d in depenses %}
+                        <tr>
+                            <td class="py-3 px-2 text-slate-500 whitespace-nowrap">{{ d.date_depense }}</td>
+                            <td class="py-3 px-2 font-medium">{{ d.motif }}</td>
+                            <td class="py-3 px-2"><span class="bg-rose-50 text-rose-700 text-xs px-2 py-1 rounded">{{ d.categorie }}</span></td>
+                            <td class="py-3 px-2 text-right font-bold text-rose-600 whitespace-nowrap">-{{ "{:,.0f}".format(d.montant) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="py-6 text-center text-slate-500">Aucune dépense.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- MODAL MEMBRE -->
+<div id="modal-membre" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-5">
+            <h3 id="memberModalTitle" class="text-lg font-bold">Ajouter un membre</h3>
+            <button onclick="closeModal('modal-membre')" class="text-slate-400 hover:text-slate-800 text-xl">&times;</button>
+        </div>
+
+        <form id="memberForm" action="{{ url_for('ajouter_membre') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="memberId">
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nom complet</label>
+                <input id="memberName" type="text" name="nom" required
+                       class="w-full border rounded-lg p-3 text-sm"
+                       placeholder="Ex: Jean Kouassi">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Téléphone</label>
+                <input id="memberPhone" type="tel" name="telephone"
+                       class="w-full border rounded-lg p-3 text-sm"
+                       placeholder="+225 07 00 00 00 00">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cotisation mensuelle (FCFA)</label>
+                <input id="memberMonthly" type="number" name="cotisation_mensuelle" min="0" step="1" value="50000" required
+                       class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button type="button" onclick="closeModal('modal-membre')"
+                        class="flex-1 px-4 py-3 border rounded-lg text-sm font-bold">Annuler</button>
+                <button type="submit"
+                        class="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg text-sm">
+                    Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL COTISATION -->
+<div id="modal-cotisation" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-lg font-bold">Enregistrer une cotisation</h3>
+            <button onclick="closeModal('modal-cotisation')" class="text-slate-400 text-xl">&times;</button>
+        </div>
+
+        <form action="{{ url_for('ajouter_cotisation') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Membre</label>
+                <select name="membre_id" required class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                    {% for m in membres %}
+                    <option value="{{ m.id }}">{{ m.nom }} — payé {{ "{:,.0f}".format(m.total_paye) }} FCFA</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Montant (FCFA)</label>
+                <input type="number" name="montant" min="1" step="1" required class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Mode de paiement</label>
+                <select name="mode_paiement" required class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                    <option value="Orange Money">Orange Money</option>
+                    <option value="Wave">Wave</option>
+                    <option value="MTN Mobile Money">MTN Mobile Money</option>
+                    <option value="Moov Money">Moov Money</option>
+                    <option value="Espèces">Espèces</option>
+                    <option value="Virement">Virement</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Date</label>
+                <input type="date" name="date_cotisation" value="{{ today }}" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button type="button" onclick="closeModal('modal-cotisation')"
+                        class="flex-1 px-4 py-3 border rounded-lg text-sm font-bold">Annuler</button>
+                <button type="submit"
+                        class="flex-1 px-4 py-3 bg-blue-600 text-white font-bold rounded-lg text-sm">
+                    Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL DEPENSE -->
+<div id="modal-depense" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-lg font-bold">Enregistrer une dépense</h3>
+            <button onclick="closeModal('modal-depense')" class="text-slate-400 text-xl">&times;</button>
+        </div>
+
+        <form action="{{ url_for('ajouter_depense') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Motif / Description</label>
+                <input type="text" name="motif" required placeholder="Ex: Achat maillots"
+                       class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Montant (FCFA)</label>
+                <input type="number" name="montant" min="1" step="1" required
+                       class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Catégorie</label>
+                <select name="categorie" class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                    <option value="Logistique">Logistique & Événement</option>
+                    <option value="Aide Sociale">Aide Sociale</option>
+                    <option value="Équipement">Sport & Équipement</option>
+                    <option value="Administration">Administration & Fournitures</option>
+                    <option value="Autre">Autre</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Date</label>
+                <input type="date" name="date_depense" value="{{ today }}" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button type="button" onclick="closeModal('modal-depense')"
+                        class="flex-1 px-4 py-3 border rounded-lg text-sm font-bold">Annuler</button>
+                <button type="submit"
+                        class="flex-1 px-4 py-3 bg-rose-600 text-white font-bold rounded-lg text-sm">
+                    Valider
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL HISTORIQUE -->
+<div id="modal-history" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-3 md:p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[92vh] overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-start gap-3">
+            <div>
+                <h3 id="historyName" class="text-xl font-extrabold">Historique</h3>
+                <p id="historyPhone" class="text-sm text-slate-500 mt-1"></p>
+            </div>
+            <button onclick="closeModal('modal-history')" class="text-slate-400 text-2xl">&times;</button>
+        </div>
+
+        <div class="p-5 overflow-y-auto max-h-[75vh]">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+                    <p class="text-xs font-bold uppercase text-emerald-600">Total payé</p>
+                    <p id="historyTotal" class="text-xl font-black text-emerald-700 mt-1">0 FCFA</p>
+                </div>
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                    <p class="text-xs font-bold uppercase text-blue-600">Mensuel prévu</p>
+                    <p id="historyMonthly" class="text-xl font-black text-blue-700 mt-1">0 FCFA</p>
+                </div>
+                <div class="bg-slate-50 border rounded-xl p-4">
+                    <p class="text-xs font-bold uppercase text-slate-500">Paiements</p>
+                    <p id="historyCount" class="text-xl font-black mt-1">0</p>
+                </div>
+            </div>
+
+            <div id="historyContent"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL HISTORIQUE GLOBAL -->
+<div id="modal-all-history" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-3 md:p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[92vh] overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center">
+            <div>
+                <h3 class="text-xl font-extrabold">Historique complet des paiements</h3>
+                <p class="text-sm text-slate-500">Tous les membres et tous les versements.</p>
+            </div>
+            <button onclick="closeModal('modal-all-history')" class="text-slate-400 text-2xl">&times;</button>
+        </div>
+
+        <div class="p-5 overflow-y-auto max-h-[78vh]">
+            <div class="relative mb-4">
+                <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input id="historySearch" type="search" oninput="filterHistoryTable()"
+                       placeholder="Rechercher un membre..."
+                       class="w-full border rounded-xl pl-11 pr-4 py-3">
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                        <tr>
+                            <th class="text-left p-3">Date</th>
+                            <th class="text-left p-3">Membre</th>
+                            <th class="text-left p-3">Mode</th>
+                            <th class="text-right p-3">Montant</th>
+                            <th class="text-right p-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allHistoryBody" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL MODIFICATION PAIEMENT -->
+<div id="modal-edit-payment" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-lg font-bold">Modifier le paiement</h3>
+            <button onclick="closeModal('modal-edit-payment')" class="text-slate-400 text-xl">&times;</button>
+        </div>
+
+        <form id="editPaymentForm" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Montant</label>
+                <input id="editPaymentAmount" name="montant" type="number" min="1" required
+                       class="w-full border rounded-lg p-3">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Mode</label>
+                <select id="editPaymentMode" name="mode_paiement" class="w-full border rounded-lg p-3">
+                    <option>Orange Money</option>
+                    <option>Wave</option>
+                    <option>MTN Mobile Money</option>
+                    <option>Moov Money</option>
+                    <option>Espèces</option>
+                    <option>Virement</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Date</label>
+                <input id="editPaymentDate" name="date_cotisation" type="date" required
+                       class="w-full border rounded-lg p-3">
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button type="button" onclick="closeModal('modal-edit-payment')"
+                        class="flex-1 border rounded-lg py-3 font-bold">Annuler</button>
+                <button type="submit"
+                        class="flex-1 bg-blue-600 text-white rounded-lg py-3 font-bold">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('hidden');
+    el.classList.add('flex');
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    el.classList.add('hidden');
+    el.classList.remove('flex');
+}
+
+window.addEventListener('click', function(e) {
+    document.querySelectorAll('.modal').forEach(modal => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    });
+});
+
+function filterMembers() {
+    const query = document.getElementById('memberSearch').value.trim().toLowerCase();
+    const items = document.querySelectorAll('.member-item');
+    let visible = 0;
+
+    items.forEach(item => {
+        const text = (item.dataset.name + ' ' + item.dataset.phone);
+        const match = text.includes(query);
+        item.classList.toggle('hidden-force', !match);
+        if (match) visible++;
+    });
+
+    document.getElementById('noMemberResult').classList.toggle('hidden-force', visible !== 0);
+}
+
+function editMember(id, name, phone, monthly) {
+    document.getElementById('memberModalTitle').textContent = 'Modifier le membre';
+    document.getElementById('memberId').value = id;
+    document.getElementById('memberName').value = name;
+    document.getElementById('memberPhone').value = phone;
+    document.getElementById('memberMonthly').value = monthly;
+
+    document.getElementById('memberForm').action = '/modifier_membre/' + id;
+    openModal('modal-membre');
+}
+
+function resetMemberForm() {
+    document.getElementById('memberModalTitle').textContent = 'Ajouter un membre';
+    document.getElementById('memberId').value = '';
+    document.getElementById('memberName').value = '';
+    document.getElementById('memberPhone').value = '';
+    document.getElementById('memberMonthly').value = '50000';
+    document.getElementById('memberForm').action = '{{ url_for("ajouter_membre") }}';
+}
+
+document.getElementById('modal-membre').addEventListener('click', function(e) {
+    if (e.target === this) resetMemberForm();
+});
+
+async function showHistory(memberId) {
+    try {
+        const response = await fetch('/api/membre/' + memberId);
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || 'Erreur');
+
+        document.getElementById('historyName').textContent = data.nom;
+        document.getElementById('historyPhone').textContent =
+            data.telephone ? 'Téléphone : ' + data.telephone : 'Téléphone non renseigné';
+
+        document.getElementById('historyTotal').textContent = formatMoney(data.total_paye);
+        document.getElementById('historyMonthly').textContent = formatMoney(data.cotisation_mensuelle);
+        document.getElementById('historyCount').textContent = data.nombre_paiements;
+
+        const content = document.getElementById('historyContent');
+
+        if (!data.paiements.length) {
+            content.innerHTML = `
+                <div class="text-center py-10 text-slate-500">
+                    <i class="fa-solid fa-receipt text-3xl mb-2"></i>
+                    <p>Aucun paiement enregistré pour ce membre.</p>
+                </div>`;
+        } else {
+            content.innerHTML = data.paiements.map(p => `
+                <div class="border rounded-xl p-4 mb-3 bg-slate-50">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <p class="font-bold text-slate-900">${escapeHtml(p.date)}</p>
+                            <p class="text-sm text-slate-500 mt-1">${escapeHtml(p.mode)}</p>
+                        </div>
+                        <div class="text-left sm:text-right">
+                            <p class="font-black text-emerald-600 text-lg">+${formatMoney(p.montant)}</p>
+                            ${CAN_EDIT ? `
+                            <div class="flex gap-2 mt-2">
+                                <button onclick="editPayment(${p.id}, ${p.montant}, '${escapeJs(p.mode)}', '${p.date}')"
+                                        class="px-3 py-1.5 bg-white border rounded-lg text-xs font-bold">
+                                    Modifier
+                                </button>
+                                <form action="/supprimer_cotisation/${p.id}" method="POST"
+                                      onsubmit="return confirm('Supprimer ce paiement ?');">
+                                    <input type="hidden" name="csrf_token" value="${CSRF_TOKEN}">
+                                    <button class="px-3 py-1.5 bg-rose-100 text-rose-700 rounded-lg text-xs font-bold">
+                                        Supprimer
+                                    </button>
+                                </form>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        openModal('modal-history');
+    } catch (error) {
+        alert('Impossible de charger l’historique.');
+    }
+}
+
+function editPayment(id, amount, mode, date) {
+    document.getElementById('editPaymentAmount').value = amount;
+    document.getElementById('editPaymentMode').value = mode;
+    document.getElementById('editPaymentDate').value = date;
+    document.getElementById('editPaymentForm').action = '/modifier_cotisation/' + id;
+
+    closeModal('modal-history');
+    openModal('modal-edit-payment');
+}
+
+async function openAllHistory() {
+    try {
+        const response = await fetch('/api/historique');
+        const data = await response.json();
+
+        const body = document.getElementById('allHistoryBody');
+
+        if (!data.length) {
+            body.innerHTML = `
+                <tr><td colspan="5" class="p-8 text-center text-slate-500">
+                    Aucun paiement enregistré.
+                </td></tr>`;
+        } else {
+            body.innerHTML = data.map(p => `
+                <tr class="history-row" data-name="${escapeAttr(p.nom.toLowerCase())}">
+                    <td class="p-3 whitespace-nowrap">${escapeHtml(p.date)}</td>
+                    <td class="p-3 font-bold">${escapeHtml(p.nom)}</td>
+                    <td class="p-3">${escapeHtml(p.mode)}</td>
+                    <td class="p-3 text-right font-black text-emerald-600 whitespace-nowrap">+${formatMoney(p.montant)}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="showHistory(${p.membre_id})"
+                                class="text-indigo-600 font-bold text-xs">
+                            Historique
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('historySearch').value = '';
+        openModal('modal-all-history');
+    } catch (error) {
+        alert('Impossible de charger l’historique complet.');
+    }
+}
+
+function filterHistoryTable() {
+    const query = document.getElementById('historySearch').value.trim().toLowerCase();
+
+    document.querySelectorAll('.history-row').forEach(row => {
+        row.classList.toggle('hidden-force', !row.dataset.name.includes(query));
+    });
+}
+
+function formatMoney(value) {
+    return new Intl.NumberFormat('fr-FR', {
+        maximumFractionDigits: 0
+    }).format(Number(value || 0)) + ' FCFA';
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
+function escapeJs(value) {
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('memberForm').addEventListener('submit', function() {
+        setTimeout(resetMemberForm, 500);
+    });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title>Utilisateurs — La Caisse d'Épargne Colombienne 🇨🇴</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+<header class="bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white border-b-4 border-amber-400 shadow-lg">
+    <div class="max-w-4xl mx-auto px-4 py-5 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-extrabold">Gestion des utilisateurs</h1>
+            <p class="text-slate-300 text-sm">La Caisse d'Épargne Colombienne 🇨🇴</p>
+        </div>
+        <a href="{{ url_for('index') }}" class="text-sm bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg">
+            <i class="fa-solid fa-arrow-left"></i> Retour
+        </a>
+    </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 py-8">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="space-y-2 mb-6">
+                {% for category, message in messages %}
+                    <div class="rounded-xl px-4 py-3 shadow-sm border text-sm
+                        {% if category == 'success' %}bg-emerald-50 text-emerald-800 border-emerald-200
+                        {% elif category == 'danger' %}bg-rose-50 text-rose-800 border-rose-200
+                        {% else %}bg-blue-50 text-blue-800 border-blue-200{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- AJOUTER UN UTILISATEUR -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+        <h2 class="text-lg font-bold mb-4"><i class="fa-solid fa-user-plus text-indigo-600"></i> Créer un accès</h2>
+
+        <form action="{{ url_for('ajouter_utilisateur') }}" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="md:col-span-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Prénom</label>
+                <input type="text" name="prenom" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div class="md:col-span-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nom</label>
+                <input type="text" name="nom" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div class="md:col-span-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Téléphone</label>
+                <input type="tel" name="username" required placeholder="+2250700000001" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div class="md:col-span-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Mot de passe</label>
+                <input type="password" name="password" required minlength="8" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div class="md:col-span-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Rôle</label>
+                <select name="role" class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                    <option value="lecture">Lecture seule</option>
+                    <option value="tresorier">Trésorier</option>
+                </select>
+            </div>
+
+            <button type="submit" class="md:col-span-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-3 rounded-lg text-sm">
+                Créer
+            </button>
+        </form>
+        <p class="text-xs text-slate-400 mt-3">
+            <i class="fa-solid fa-circle-info"></i> "Lecture seule" peut consulter le dashboard sans rien modifier.
+            "Trésorier" peut tout ajouter, modifier et supprimer.
+        </p>
+    </section>
+
+    <!-- LISTE -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-bold mb-4"><i class="fa-solid fa-users text-indigo-600"></i> Comptes existants</h2>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                    <tr>
+                        <th class="py-3 px-2">Nom</th>
+                        <th class="py-3 px-2">Téléphone</th>
+                        <th class="py-3 px-2">Rôle</th>
+                        <th class="py-3 px-2 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for u in utilisateurs %}
+                    <tr>
+                        <td class="py-3 px-2">{{ (u.prenom or '') ~ ' ' ~ (u.nom or '') }}</td>
+                        <td class="py-3 px-2 font-bold">{{ u.username }}</td>
+                        <td class="py-3 px-2">
+                            <span class="text-xs px-2 py-1 rounded font-bold
+                                {% if u.role == 'super_admin' %}bg-indigo-100 text-indigo-700
+                                {% elif u.role == 'tresorier' %}bg-amber-100 text-amber-700
+                                {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {% if u.role == 'super_admin' %}Super admin
+                                {% elif u.role == 'tresorier' %}Trésorier
+                                {% else %}Lecture seule{% endif %}
+                            </span>
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                            {% if u.role == 'super_admin' %}
+                            <span class="text-xs text-slate-400">Protégé</span>
+                            {% else %}
+                            <div class="flex justify-end items-center gap-2">
+                                <form action="{{ url_for('changer_role_utilisateur', user_id=u.id) }}" method="POST" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <select name="role" onchange="this.form.submit()"
+                                            class="text-xs border rounded-lg py-1.5 px-2">
+                                        <option value="lecture" {% if u.role == 'lecture' %}selected{% endif %}>Lecture seule</option>
+                                        <option value="tresorier" {% if u.role == 'tresorier' %}selected{% endif %}>Trésorier</option>
+                                    </select>
+                                </form>
+                                {% if u.id|string != current_user.id %}
+                                <form action="{{ url_for('supprimer_utilisateur', user_id=u.id) }}" method="POST"
+                                      onsubmit="return confirm('Supprimer ce compte ?');" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="bg-rose-100 text-rose-700 rounded-lg py-1.5 px-3 text-xs font-bold">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+</body>
+</html>
