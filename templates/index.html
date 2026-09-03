@@ -292,6 +292,7 @@
                             <th class="py-3 px-2">Membre</th>
                             <th class="py-3 px-2">Mode</th>
                             <th class="py-3 px-2 text-right">Montant</th>
+                            <th class="py-3 px-2 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -301,9 +302,20 @@
                             <td class="py-3 px-2 font-semibold">{{ c.nom }}</td>
                             <td class="py-3 px-2"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">{{ c.mode_paiement }}</span></td>
                             <td class="py-3 px-2 text-right font-bold text-emerald-600 whitespace-nowrap">+{{ "{:,.0f}".format(c.montant) }}</td>
+                            <td class="py-3 px-2 text-right">
+                                {% if current_user.role in ['tresorier', 'super_admin'] %}
+                                <form action="{{ url_for('supprimer_cotisation', cotisation_id=c.id) }}" method="POST"
+                                      onsubmit="return confirm('Supprimer ce versement de {{ c.nom }} ({{ '{:,.0f}'.format(c.montant) }}) ?');" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="bg-rose-100 text-rose-700 rounded-lg py-1.5 px-2.5 text-xs font-bold">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="4" class="py-6 text-center text-slate-500">Aucune cotisation.</td></tr>
+                        <tr><td colspan="5" class="py-6 text-center text-slate-500">Aucune cotisation.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -316,6 +328,7 @@
                     <i class="fa-solid fa-arrow-up-long text-rose-500"></i>
                     Dernières dépenses
                 </h3>
+                <button onclick="openAllDepenses()" class="text-sm font-bold text-indigo-600">Tout voir</button>
             </div>
 
             <div class="overflow-x-auto">
@@ -326,6 +339,7 @@
                             <th class="py-3 px-2">Motif</th>
                             <th class="py-3 px-2">Catégorie</th>
                             <th class="py-3 px-2 text-right">Montant</th>
+                            <th class="py-3 px-2 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -335,9 +349,20 @@
                             <td class="py-3 px-2 font-medium">{{ d.motif }}</td>
                             <td class="py-3 px-2"><span class="bg-rose-50 text-rose-700 text-xs px-2 py-1 rounded">{{ d.categorie }}</span></td>
                             <td class="py-3 px-2 text-right font-bold text-rose-600 whitespace-nowrap">-{{ "{:,.0f}".format(d.montant) }}</td>
+                            <td class="py-3 px-2 text-right">
+                                {% if current_user.role in ['tresorier', 'super_admin'] %}
+                                <form action="{{ url_for('supprimer_depense', depense_id=d.id) }}" method="POST"
+                                      onsubmit="return confirm('Supprimer cette dépense ({{ d.motif }}) ?');" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="bg-rose-100 text-rose-700 rounded-lg py-1.5 px-2.5 text-xs font-bold">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="4" class="py-6 text-center text-slate-500">Aucune dépense.</td></tr>
+                        <tr><td colspan="5" class="py-6 text-center text-slate-500">Aucune dépense.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -402,9 +427,13 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Membre</label>
-                <select name="membre_id" required class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                <input type="text" id="membreSearchCotisation"
+                       oninput="filterMembreSelect('membreSearchCotisation', 'membreSelectCotisation')"
+                       placeholder="Rechercher un membre..."
+                       class="w-full border rounded-lg p-2.5 text-sm mb-1.5">
+                <select name="membre_id" id="membreSelectCotisation" required class="w-full border rounded-lg p-3 text-sm bg-white text-slate-900">
                     {% for m in membres %}
-                    <option value="{{ m.id }}">{{ m.nom }} — payé {{ "{:,.0f}".format(m.total_paye) }} FCFA</option>
+                    <option value="{{ m.id }}" data-search="{{ m.nom|lower }}">{{ m.nom }} — payé {{ "{:,.0f}".format(m.total_paye) }} FCFA</option>
                     {% endfor %}
                 </select>
             </div>
@@ -416,7 +445,7 @@
 
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Mode de paiement</label>
-                <select name="mode_paiement" required class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                <select name="mode_paiement" required class="w-full border rounded-lg p-3 text-sm bg-white text-slate-900">
                     <option value="Orange Money">Orange Money</option>
                     <option value="Wave">Wave</option>
                     <option value="MTN Mobile Money">MTN Mobile Money</option>
@@ -467,7 +496,7 @@
 
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Catégorie</label>
-                <select name="categorie" class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                <select name="categorie" class="w-full border rounded-lg p-3 text-sm bg-white text-slate-900">
                     <option value="Logistique">Logistique & Événement</option>
                     <option value="Aide Sociale">Aide Sociale</option>
                     <option value="Équipement">Sport & Équipement</option>
@@ -562,6 +591,43 @@
     </div>
 </div>
 
+<!-- MODAL TOUTES LES DÉPENSES -->
+<div id="modal-all-depenses" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-3 md:p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[92vh] overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center">
+            <div>
+                <h3 class="text-xl font-extrabold">Historique complet des dépenses</h3>
+                <p class="text-sm text-slate-500">Toutes les dépenses enregistrées.</p>
+            </div>
+            <button onclick="closeModal('modal-all-depenses')" class="text-slate-400 text-2xl">&times;</button>
+        </div>
+
+        <div class="p-5 overflow-y-auto max-h-[78vh]">
+            <div class="relative mb-4">
+                <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input id="depensesSearch" type="search" oninput="filterDepensesTable()"
+                       placeholder="Rechercher un motif ou une catégorie..."
+                       class="w-full border rounded-xl pl-11 pr-4 py-3">
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                        <tr>
+                            <th class="text-left p-3">Date</th>
+                            <th class="text-left p-3">Motif</th>
+                            <th class="text-left p-3">Catégorie</th>
+                            <th class="text-right p-3">Montant</th>
+                            <th class="text-right p-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allDepensesBody" class="divide-y"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL MODIFICATION PAIEMENT -->
 <div id="modal-edit-payment" class="modal hidden fixed inset-0 modal-backdrop backdrop-blur-sm items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
@@ -579,7 +645,7 @@
             </div>
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Mode</label>
-                <select id="editPaymentMode" name="mode_paiement" class="w-full border rounded-lg p-3">
+                <select id="editPaymentMode" name="mode_paiement" class="w-full border rounded-lg p-3 bg-white text-slate-900">
                     <option>Orange Money</option>
                     <option>Wave</option>
                     <option>MTN Mobile Money</option>
@@ -776,6 +842,70 @@ function filterHistoryTable() {
     document.querySelectorAll('.history-row').forEach(row => {
         row.classList.toggle('hidden-force', !row.dataset.name.includes(query));
     });
+}
+
+async function openAllDepenses() {
+    try {
+        const response = await fetch('/api/toutes-depenses');
+        const data = await response.json();
+
+        const body = document.getElementById('allDepensesBody');
+
+        if (!data.length) {
+            body.innerHTML = `
+                <tr><td colspan="5" class="p-8 text-center text-slate-500">
+                    Aucune dépense enregistrée.
+                </td></tr>`;
+        } else {
+            body.innerHTML = data.map(d => `
+                <tr class="depense-row" data-search="${escapeAttr((d.motif + ' ' + d.categorie).toLowerCase())}">
+                    <td class="p-3 whitespace-nowrap">${escapeHtml(d.date)}</td>
+                    <td class="p-3 font-medium">${escapeHtml(d.motif)}</td>
+                    <td class="p-3"><span class="bg-rose-50 text-rose-700 text-xs px-2 py-1 rounded">${escapeHtml(d.categorie)}</span></td>
+                    <td class="p-3 text-right font-black text-rose-600 whitespace-nowrap">-${formatMoney(d.montant)}</td>
+                    <td class="p-3 text-right">
+                        ${CAN_EDIT ? `
+                        <form action="/supprimer_depense/${d.id}" method="POST"
+                              onsubmit="return confirm('Supprimer cette dépense (${escapeJs(d.motif)}) ?');">
+                            <input type="hidden" name="csrf_token" value="${CSRF_TOKEN}">
+                            <button class="text-rose-600 font-bold text-xs">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('depensesSearch').value = '';
+        openModal('modal-all-depenses');
+    } catch (error) {
+        alert('Impossible de charger l’historique des dépenses.');
+    }
+}
+
+function filterDepensesTable() {
+    const query = document.getElementById('depensesSearch').value.trim().toLowerCase();
+
+    document.querySelectorAll('.depense-row').forEach(row => {
+        row.classList.toggle('hidden-force', !row.dataset.search.includes(query));
+    });
+}
+
+function filterMembreSelect(inputId, selectId) {
+    const query = document.getElementById(inputId).value.trim().toLowerCase();
+    const select = document.getElementById(selectId);
+    let firstVisible = null;
+
+    Array.from(select.options).forEach(opt => {
+        const match = !query || (opt.dataset.search || '').includes(query);
+        opt.hidden = !match;
+        if (match && firstVisible === null) firstVisible = opt;
+    });
+
+    if (firstVisible && select.selectedOptions[0] && select.selectedOptions[0].hidden) {
+        select.value = firstVisible.value;
+    }
 }
 
 function formatMoney(value) {

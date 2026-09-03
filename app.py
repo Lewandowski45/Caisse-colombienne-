@@ -840,6 +840,29 @@ def api_historique():
     ])
 
 
+@app.route("/api/toutes-depenses")
+@login_required
+def api_toutes_depenses():
+    conn = get_db_connection()
+    depenses = conn.execute("""
+        SELECT id, motif, montant, categorie, date_depense
+        FROM depenses
+        ORDER BY date_depense DESC, id DESC
+    """).fetchall()
+    conn.close()
+
+    return jsonify([
+        {
+            "id": d["id"],
+            "motif": d["motif"],
+            "categorie": d["categorie"],
+            "montant": float(d["montant"]),
+            "date": d["date_depense"].isoformat(),
+        }
+        for d in depenses
+    ])
+
+
 # init_db() n'est PAS appelée automatiquement au chargement du module.
 # Les tables et le compte super_admin existent déjà sur Supabase — l'appeler
 # à chaque démarrage à froid de la fonction (Vercel) ajoutait plusieurs

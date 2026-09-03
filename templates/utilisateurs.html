@@ -78,7 +78,7 @@
 
             <div class="md:col-span-1">
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Rôle</label>
-                <select name="role" class="w-full border rounded-lg p-3 text-sm bg-slate-50">
+                <select name="role" class="w-full border rounded-lg p-3 text-sm bg-white text-slate-900">
                     <option value="lecture">Lecture seule</option>
                     <option value="tresorier">Trésorier</option>
                 </select>
@@ -131,7 +131,7 @@
                                 <form action="{{ url_for('changer_role_utilisateur', user_id=u.id) }}" method="POST" class="inline">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <select name="role" onchange="this.form.submit()"
-                                            class="text-xs border rounded-lg py-1.5 px-2">
+                                            class="text-xs border rounded-lg py-1.5 px-2 bg-white text-slate-900">
                                         <option value="lecture" {% if u.role == 'lecture' %}selected{% endif %}>Lecture seule</option>
                                         <option value="tresorier" {% if u.role == 'tresorier' %}selected{% endif %}>Trésorier</option>
                                     </select>
