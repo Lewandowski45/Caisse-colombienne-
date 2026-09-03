@@ -156,7 +156,7 @@ def init_db():
             id SERIAL PRIMARY KEY,
             nom TEXT NOT NULL,
             telephone TEXT,
-            cotisation_mensuelle NUMERIC(12,2) NOT NULL DEFAULT 50000
+            cotisation_mensuelle NUMERIC(12,2) NOT NULL DEFAULT 3000
         )
     """)
 
@@ -682,12 +682,12 @@ def supprimer_depense(depense_id):
 def ajouter_membre():
     nom = (request.form.get("nom") or "").strip()
     telephone = (request.form.get("telephone") or "").strip()
-    cotisation_raw = request.form.get("cotisation_mensuelle") or "50000"
+    cotisation_raw = request.form.get("cotisation_mensuelle") or "3000"
 
     try:
         cotisation = float(cotisation_raw)
     except (TypeError, ValueError):
-        cotisation = 50000
+        cotisation = 3000
 
     if not nom:
         flash("Le nom du membre est obligatoire.", "danger")
@@ -715,12 +715,12 @@ def ajouter_membre():
 def modifier_membre(membre_id):
     nom = (request.form.get("nom") or "").strip()
     telephone = (request.form.get("telephone") or "").strip()
-    cotisation_raw = request.form.get("cotisation_mensuelle") or "50000"
+    cotisation_raw = request.form.get("cotisation_mensuelle") or "3000"
 
     try:
         cotisation = float(cotisation_raw)
     except (TypeError, ValueError):
-        cotisation = 50000
+        cotisation = 3000
 
     if not nom or cotisation < 0:
         flash("Informations du membre invalides.", "danger")

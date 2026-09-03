@@ -399,7 +399,7 @@
 
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cotisation mensuelle (FCFA)</label>
-                <input id="memberMonthly" type="number" name="cotisation_mensuelle" min="0" step="1" value="50000" required
+                <input id="memberMonthly" type="number" name="cotisation_mensuelle" min="0" step="1" value="3000" required
                        class="w-full border rounded-lg p-3 text-sm">
             </div>
 
@@ -723,7 +723,7 @@ function resetMemberForm() {
     document.getElementById('memberId').value = '';
     document.getElementById('memberName').value = '';
     document.getElementById('memberPhone').value = '';
-    document.getElementById('memberMonthly').value = '50000';
+    document.getElementById('memberMonthly').value = '3000';
     document.getElementById('memberForm').action = '{{ url_for("ajouter_membre") }}';
 }
 
