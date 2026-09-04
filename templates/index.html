@@ -98,6 +98,10 @@
                             {% else %}Lecture{% endif %}
                         </span>
                     </span>
+                    <a href="{{ url_for('bilan_annuel') }}"
+                       class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg">
+                        <i class="fa-solid fa-file-invoice"></i> Bilan annuel
+                    </a>
                     {% if current_user.role == 'super_admin' %}
                     <a href="{{ url_for('utilisateurs') }}"
                        class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg">
@@ -246,11 +250,16 @@
                     <span>Dernier : {{ m.dernier_paiement or "—" }}</span>
                 </div>
 
-                <div class="grid {% if current_user.role in ['tresorier', 'super_admin'] %}grid-cols-2{% endif %} gap-2 mt-4">
+                <div class="grid {% if current_user.role in ['tresorier', 'super_admin'] %}grid-cols-3{% else %}grid-cols-2{% endif %} gap-2 mt-4">
                     <button onclick="showHistory({{ m.id }})"
                             class="bg-slate-900 hover:bg-slate-800 text-white rounded-lg py-2.5 text-sm font-bold">
                         <i class="fa-solid fa-clock-rotate-left"></i> Historique
                     </button>
+
+                    <a href="{{ url_for('bilan_membre', membre_id=m.id) }}"
+                       class="bg-white hover:bg-slate-100 border rounded-lg py-2.5 text-sm font-bold text-slate-700 text-center">
+                        <i class="fa-solid fa-file-invoice"></i> Bilan
+                    </a>
 
                     {% if current_user.role in ['tresorier', 'super_admin'] %}
                     <button onclick='editMember({{ m.id }}, {{ m.nom|tojson }}, {{ (m.telephone or "")|tojson }}, {{ m.cotisation_mensuelle }})'

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title>Bilan {{ annee }} — {{ membre.nom }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; }
+            .print-card { break-inside: avoid; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+<div class="no-print bg-slate-950 text-white sticky top-0 z-10 shadow">
+    <div class="max-w-2xl mx-auto px-4 py-3 flex flex-wrap gap-3 justify-between items-center">
+        <a href="{{ url_for('index') }}" class="text-sm bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg">
+            <i class="fa-solid fa-arrow-left"></i> Retour
+        </a>
+        <form method="GET" class="flex items-center gap-2">
+            <select name="mois" onchange="this.form.submit()" class="bg-white text-slate-900 text-sm rounded-lg px-3 py-2">
+                <option value="">Toute l'année</option>
+                {% for i in range(1, 13) %}
+                <option value="{{ i }}" {% if mois == i %}selected{% endif %}>{{ mois_noms[i-1] }}</option>
+                {% endfor %}
+            </select>
+            <select name="annee" onchange="this.form.submit()" class="bg-white text-slate-900 text-sm rounded-lg px-3 py-2">
+                {% for a in annees %}
+                <option value="{{ a }}" {% if a == annee %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <button onclick="window.print()" class="text-sm bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-bold">
+            <i class="fa-solid fa-print"></i> Imprimer / PDF
+        </button>
+    </div>
+</div>
+
+<div class="max-w-2xl mx-auto p-4 md:p-8">
+
+    <div class="flex items-center gap-4 mb-6 print-card">
+        <img src="/logo-bl.png" alt="Logo" class="w-16 h-16 rounded-xl object-cover">
+        <div>
+            <h1 class="text-xl md:text-2xl font-extrabold text-slate-900">La Caisse d'Épargne Colombienne 🇨🇴</h1>
+            <p class="text-slate-500">Bilan individuel — {% if mois %}{{ mois_noms[mois-1] }} {% endif %}{{ annee }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border p-4 md:p-6 mb-6 print-card">
+        <p class="text-xs text-slate-500 uppercase font-bold">Membre</p>
+        <p class="text-lg font-extrabold text-slate-900">{{ membre.nom }}</p>
+        {% if membre.telephone %}<p class="text-sm text-slate-500">{{ membre.telephone }}</p>{% endif %}
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mb-6">
+        <div class="bg-white rounded-xl border p-4 text-center print-card">
+            <p class="text-xs text-slate-500 uppercase font-bold">Versé {% if mois %}en {{ mois_noms[mois-1] }}{% else %}en {{ annee }}{% endif %}</p>
+            <p class="text-lg md:text-xl font-black text-emerald-600 mt-1">{{ "{:,.0f}".format(total_verse) }}</p>
+        </div>
+        <div class="bg-white rounded-xl border p-4 text-center print-card">
+            <p class="text-xs text-slate-500 uppercase font-bold">Attendu {% if mois %}ce mois{% else %}sur l'année{% endif %}</p>
+            <p class="text-lg md:text-xl font-black text-slate-700 mt-1">{{ "{:,.0f}".format(attendu_annuel) }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border p-4 md:p-6 mb-6 print-card">
+        <h2 class="font-bold text-slate-800 mb-4"><i class="fa-solid fa-receipt text-emerald-600"></i> Détail des versements</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="text-xs uppercase text-slate-500 border-b">
+                    <tr>
+                        <th class="text-left py-2 pr-2">Date</th>
+                        <th class="text-left py-2 px-2">Mode</th>
+                        <th class="text-right py-2 pl-2">Montant</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for p in paiements %}
+                    <tr>
+                        <td class="py-2 pr-2 whitespace-nowrap text-slate-500">{{ p.date_cotisation }}</td>
+                        <td class="py-2 px-2">{{ p.mode_paiement }}</td>
+                        <td class="py-2 pl-2 text-right font-bold text-emerald-600">{{ "{:,.0f}".format(p.montant) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="py-6 text-center text-slate-500">Aucun versement {% if mois %}en {{ mois_noms[mois-1] }} {% endif %}{{ annee }}.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <p class="text-xs text-slate-400 text-center mt-8">
+        Bilan généré le {{ genere_le }} — La Caisse d'Épargne Colombienne 🇨🇴
+    </p>
+</div>
+
+</body>
+</html>

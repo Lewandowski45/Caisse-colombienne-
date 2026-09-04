@@ -863,6 +863,211 @@ def api_toutes_depenses():
     ])
 
 
+def annees_disponibles(conn):
+    """Liste des années où il existe au moins une cotisation ou une dépense,
+    plus l'année en cours si elle n'y est pas déjà (pour un premier bilan
+    même sans données)."""
+    rows = conn.execute("""
+        SELECT DISTINCT EXTRACT(YEAR FROM date_cotisation)::int AS annee FROM cotisations
+        UNION
+        SELECT DISTINCT EXTRACT(YEAR FROM date_depense)::int AS annee FROM depenses
+        ORDER BY annee DESC
+    """).fetchall()
+    annees = [r["annee"] for r in rows]
+    annee_courante = datetime.now().year
+    if annee_courante not in annees:
+        annees.insert(0, annee_courante)
+    return annees
+
+
+MOIS_NOMS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+             "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+
+MODES_PAIEMENT = ["Orange Money", "Wave", "MTN Mobile Money", "Moov Money", "Espèces", "Virement"]
+
+
+def annees_disponibles(conn):
+    """Liste des années où il existe au moins une cotisation ou une dépense,
+    plus l'année en cours si elle n'y est pas déjà (pour un premier bilan
+    même sans données)."""
+    rows = conn.execute("""
+        SELECT DISTINCT EXTRACT(YEAR FROM date_cotisation)::int AS annee FROM cotisations
+        UNION
+        SELECT DISTINCT EXTRACT(YEAR FROM date_depense)::int AS annee FROM depenses
+        ORDER BY annee DESC
+    """).fetchall()
+    annees = [r["annee"] for r in rows]
+    annee_courante = datetime.now().year
+    if annee_courante not in annees:
+        annees.insert(0, annee_courante)
+    return annees
+
+
+@app.route("/bilan-annuel")
+@login_required
+def bilan_annuel():
+    annee = request.args.get("annee", type=int) or datetime.now().year
+    mois = request.args.get("mois", type=int)  # None = toute l'année
+    if mois not in range(1, 13):
+        mois = None
+
+    conn = get_db_connection()
+
+    filtre_cotis = "EXTRACT(YEAR FROM date_cotisation) = ?"
+    filtre_dep = "EXTRACT(YEAR FROM date_depense) = ?"
+    params_cotis = [annee]
+    params_dep = [annee]
+    if mois:
+        filtre_cotis += " AND EXTRACT(MONTH FROM date_cotisation) = ?"
+        filtre_dep += " AND EXTRACT(MONTH FROM date_depense) = ?"
+        params_cotis.append(mois)
+        params_dep.append(mois)
+
+    total_cotisations = conn.execute(
+        f"SELECT COALESCE(SUM(montant), 0) AS total FROM cotisations WHERE {filtre_cotis}",
+        params_cotis,
+    ).fetchone()["total"]
+
+    total_depenses = conn.execute(
+        f"SELECT COALESCE(SUM(montant), 0) AS total FROM depenses WHERE {filtre_dep}",
+        params_dep,
+    ).fetchone()["total"]
+
+    filtre_join = "c.membre_id = m.id AND EXTRACT(YEAR FROM c.date_cotisation) = ?"
+    params_join = [annee]
+    if mois:
+        filtre_join += " AND EXTRACT(MONTH FROM c.date_cotisation) = ?"
+        params_join.append(mois)
+
+    membres = conn.execute(f"""
+        SELECT
+            m.id, m.nom, m.cotisation_mensuelle,
+            COALESCE(SUM(c.montant), 0) AS total_verse,
+            COUNT(c.id) AS nombre_versements
+        FROM membres m
+        LEFT JOIN cotisations c ON {filtre_join}
+        GROUP BY m.id
+        ORDER BY LOWER(m.nom) ASC
+    """, params_join).fetchall()
+
+    depenses_categories = conn.execute(f"""
+        SELECT categorie, COALESCE(SUM(montant), 0) AS total
+        FROM depenses
+        WHERE {filtre_dep}
+        GROUP BY categorie
+        ORDER BY total DESC
+    """, params_dep).fetchall()
+
+    depenses_liste = conn.execute(f"""
+        SELECT motif, categorie, montant, date_depense
+        FROM depenses
+        WHERE {filtre_dep}
+        ORDER BY date_depense ASC
+    """, params_dep).fetchall()
+
+    # Répartition des versements par mode de paiement, mois par mois
+    filtre_modes = "EXTRACT(YEAR FROM date_cotisation) = ?"
+    params_modes = [annee]
+    if mois:
+        filtre_modes += " AND EXTRACT(MONTH FROM date_cotisation) = ?"
+        params_modes.append(mois)
+
+    lignes_modes = conn.execute(f"""
+        SELECT EXTRACT(MONTH FROM date_cotisation)::int AS mois, mode_paiement,
+               COALESCE(SUM(montant), 0) AS total
+        FROM cotisations
+        WHERE {filtre_modes}
+        GROUP BY mois, mode_paiement
+        ORDER BY mois
+    """, params_modes).fetchall()
+
+    par_mois = {}
+    for r in lignes_modes:
+        par_mois.setdefault(r["mois"], {})[r["mode_paiement"]] = float(r["total"])
+
+    repartition_modes = []
+    for m in sorted(par_mois.keys()):
+        valeurs = {mode: par_mois[m].get(mode, 0) for mode in MODES_PAIEMENT}
+        repartition_modes.append({
+            "mois": MOIS_NOMS[m - 1],
+            "valeurs": valeurs,
+            "total": sum(valeurs.values()),
+        })
+
+    annees = annees_disponibles(conn)
+    conn.close()
+
+    return render_template(
+        "bilan_annuel.html",
+        annee=annee,
+        annees=annees,
+        mois=mois,
+        mois_noms=MOIS_NOMS,
+        total_cotisations=total_cotisations,
+        total_depenses=total_depenses,
+        solde_net=total_cotisations - total_depenses,
+        membres=membres,
+        depenses_categories=depenses_categories,
+        depenses_liste=depenses_liste,
+        modes_paiement=MODES_PAIEMENT,
+        repartition_modes=repartition_modes,
+        genere_le=datetime.now().strftime("%d/%m/%Y à %H:%M"),
+    )
+
+
+@app.route("/bilan-annuel/membre/<int:membre_id>")
+@login_required
+def bilan_membre(membre_id):
+    annee = request.args.get("annee", type=int) or datetime.now().year
+    mois = request.args.get("mois", type=int)
+    if mois not in range(1, 13):
+        mois = None
+
+    conn = get_db_connection()
+
+    membre = conn.execute(
+        "SELECT id, nom, telephone, cotisation_mensuelle FROM membres WHERE id = ?",
+        (membre_id,),
+    ).fetchone()
+
+    if not membre:
+        conn.close()
+        flash("Membre introuvable.", "danger")
+        return redirect(url_for("index"))
+
+    filtre = "membre_id = ? AND EXTRACT(YEAR FROM date_cotisation) = ?"
+    params = [membre_id, annee]
+    if mois:
+        filtre += " AND EXTRACT(MONTH FROM date_cotisation) = ?"
+        params.append(mois)
+
+    paiements = conn.execute(f"""
+        SELECT montant, mode_paiement, date_cotisation
+        FROM cotisations
+        WHERE {filtre}
+        ORDER BY date_cotisation ASC
+    """, params).fetchall()
+
+    annees = annees_disponibles(conn)
+    conn.close()
+
+    total_verse = sum(float(p["montant"]) for p in paiements)
+    attendu = float(membre["cotisation_mensuelle"]) * (1 if mois else 12)
+
+    return render_template(
+        "bilan_membre.html",
+        membre=membre,
+        annee=annee,
+        annees=annees,
+        mois=mois,
+        mois_noms=MOIS_NOMS,
+        paiements=paiements,
+        total_verse=total_verse,
+        attendu_annuel=attendu,
+        genere_le=datetime.now().strftime("%d/%m/%Y à %H:%M"),
+    )
+
+
 # init_db() n'est PAS appelée automatiquement au chargement du module.
 # Les tables et le compte super_admin existent déjà sur Supabase — l'appeler
 # à chaque démarrage à froid de la fonction (Vercel) ajoutait plusieurs
